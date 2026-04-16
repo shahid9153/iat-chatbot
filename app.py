@@ -193,7 +193,7 @@ if st.session_state.typing:
     time.sleep(1)
 
     user_msg = st.session_state.chat[-1][1]
-    bot_reply = get_response(user_msg)
+    bot_reply = get_response(user_msg, st.session_state.chat)
 
     # 🎯 Trigger lead form
     if any(word in user_msg.lower() for word in ["interested", "price", "cost", "service", "hire", "job"]):

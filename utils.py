@@ -1,9 +1,8 @@
-import google.generativeai as genai
+import google.genai as genai
 import csv
 import os
 from prompt import SYSTEM_PROMPT, KNOWLEDGE_BASE
-
-model = genai.GenerativeModel("gemini-2.5-flash")
+from config import client
 
 # 📊 Save leads
 def save_lead(name, email, message):
@@ -18,15 +17,34 @@ def save_lead(name, email, message):
         writer.writerow([name, email, message])
 
 
-def get_response(user_input):
+def get_response(user_input, chat_history=None):
+    if not client:
+        return "⚠️ Chatbot is not configured properly. Please check the API key."
+
     try:
-        full_prompt = SYSTEM_PROMPT + "\n" + KNOWLEDGE_BASE + "\nUser: " + user_input
-        response = model.generate_content(full_prompt)
+        # Build conversation context
+        context = SYSTEM_PROMPT + "\n" + KNOWLEDGE_BASE + "\n\nConversation History:\n"
+        if chat_history:
+            for role, msg in chat_history[-10:]:  # Last 10 messages for context
+                context += f"{role.capitalize()}: {msg}\n"
+        context += f"User: {user_input}\nAssistant:"
+
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=context
+        )
 
         if response and hasattr(response, "text"):
-            return response.text
+            return response.text.strip()
 
-        return "Sorry, I couldn't understand that."
+        return "Sorry, I couldn't generate a response."
 
-    except Exception:
-        return "⚠️ Server busy. Please try again later."
+    except genai.errors.ClientError as e:
+        if "403" in str(e) or "PERMISSION_DENIED" in str(e):
+            return "⚠️ Invalid API key. Please check your configuration."
+        elif "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            return "⚠️ Rate limit exceeded. Please try again later."
+        else:
+            return f"⚠️ API error: {str(e)}"
+    except Exception as e:
+        return f"⚠️ Unexpected error: {str(e)}"
